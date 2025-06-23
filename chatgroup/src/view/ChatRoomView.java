@@ -7,8 +7,6 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-
-
 import java.awt.*;
 
 import dao.ChatRoomDAO;
@@ -28,7 +26,8 @@ import java.util.Base64;
 import client.SocketClientHandler;
 import security.MyKeyManager;
 
-
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class ChatRoomView extends JFrame {
     private JList<String> roomList;
@@ -53,11 +52,16 @@ public class ChatRoomView extends JFrame {
     private String currentRoom;
     private JList<String> listJoinedRooms;
     private JScrollPane scrollPaneJoinedRooms;
+    private JButton btnEmoji;
+    private JButton btnSendFile;
+    private String message;
 
 
 
     public ChatRoomView(String currentUser) {
     	this.username = currentUser;
+    	
+
 
         setTitle("💬 Chat nhóm - " + currentUser);
         try {
@@ -65,7 +69,7 @@ public class ChatRoomView extends JFrame {
             MyKeyManager.generateAndSaveKeyPair();
 
             socket = new Socket("localhost", 5000); // hoặc cổng bạn dùng
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
             out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
             out.println(currentUser); // Gửi tên khi mới kết nối
            
@@ -186,10 +190,53 @@ public class ChatRoomView extends JFrame {
         btnSend.setForeground(Color.WHITE);
         btnSend.setFocusPainted(false);
         btnSend.setPreferredSize(new Dimension(80, 35));
+        
+        btnEmoji = new JButton("😊");
+        btnEmoji.setPreferredSize(new Dimension(50, 35));
+        
+        btnEmoji.addActionListener(e -> openEmojiPicker());
+
+        btnSendFile = new JButton("📎");
+        btnSendFile.setPreferredSize(new Dimension(50, 35));
+        
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 3, 5, 0));
+        buttonPanel.add(btnEmoji);
+        buttonPanel.add(btnSendFile);
+        
+        btnSendFile.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                try {
+                    // Gửi lệnh để báo server sắp nhận file
+                    out.println("/file " + selectedFile.getName() + " " + selectedFile.length());
+
+                    // Tạo stream gửi dữ liệu file
+                    byte[] buffer = new byte[4096];
+                    FileInputStream fis = new FileInputStream(selectedFile);
+                    BufferedOutputStream bos = new BufferedOutputStream(socket.getOutputStream());
+
+                    int count;
+                    while ((count = fis.read(buffer)) > 0) {
+                        bos.write(buffer, 0, count);
+                    }
+                    bos.flush();
+
+                    JOptionPane.showMessageDialog(this, "📤 File đã được gửi: " + selectedFile.getName());
+
+                    fis.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(this, "❌ Lỗi gửi file!");
+                }
+            }
+        });
+
+        buttonPanel.add(btnSend);
 
         inputPanel.add(txtMessage, BorderLayout.CENTER);
-        inputPanel.add(btnSend, BorderLayout.EAST);
-        inputPanel.setBorder(new EmptyBorder(0, 10, 10, 10));
+        inputPanel.add(buttonPanel, BorderLayout.EAST);
 
         centerPanel.add(inputPanel, BorderLayout.SOUTH);
         add(centerPanel, BorderLayout.CENTER);
@@ -314,11 +361,6 @@ public class ChatRoomView extends JFrame {
         rightMainPanel.add(roomPanel, BorderLayout.CENTER);
         add(rightMainPanel, BorderLayout.EAST);
 
-
-        // ===== Test demo =====
-//        addMessage("trung: hello", false);
-//        addMessage("mình: hello bạn!", true);
-
         btnSend.addActionListener(e -> {
             String text = txtMessage.getText().trim();
 
@@ -397,6 +439,49 @@ public class ChatRoomView extends JFrame {
         chatArea.repaint();
         scrollPane.getVerticalScrollBar().setValue(scrollPane.getVerticalScrollBar().getMaximum());
     }
+    private void openEmojiPicker() {
+        EmojiPicker picker = new EmojiPicker(this);
+        picker.setVisible(true); // hiển thị picker
 
-
+        String selectedEmoji = picker.getSelectedEmoji(); // lấy emoji sau khi chọn
+        if (selectedEmoji != null && !selectedEmoji.isEmpty()) {
+            txtMessage.setText(txtMessage.getText() + selectedEmoji); // chèn vào ô nhập
+        }
+    }
+    public void attachDownloadAction(String message) {
+        Component[] components = chatArea.getComponents();
+        for (Component c : components) {
+            if (c instanceof MessageBubble) {
+                MessageBubble bubble = (MessageBubble) c;
+                if (bubble.getMessage().equals(message)) {
+                    bubble.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                    bubble.addMouseListener(new MouseAdapter() {
+                        @Override
+                        public void mouseClicked(MouseEvent e) {
+                            // 👉 Trích tên file từ message
+                            int start = message.indexOf("file: ") + 6;
+                            int end = message.indexOf(" – ");
+                            if (start >= 6 && end > start) {
+                                String fileName = message.substring(start, end);
+                                File file = new File("received_files/" + fileName);
+                                if (file.exists()) {
+                                    try {
+                                        Desktop.getDesktop().open(file);
+                                    } catch (IOException ex) {
+                                        JOptionPane.showMessageDialog(null, "Không thể mở file!");
+                                    }
+                                } else {
+                                    JOptionPane.showMessageDialog(null, "File không tồn tại!");
+                                }
+                            }
+                        }
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    public String getMessage() {
+        return message;
+    }
 }

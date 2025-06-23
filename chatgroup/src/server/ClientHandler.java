@@ -31,7 +31,7 @@ public class ClientHandler implements Runnable {
     public void run() {
         try {
         	in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-            out = new PrintWriter(socket.getOutputStream(), true);
+        	out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
 
             username = in.readLine();
             currentRoom = "phòng mặc định"; // đảm bảo không null
@@ -83,6 +83,7 @@ public class ClientHandler implements Runnable {
                                 byte[] encrypted = security.EncryptionUtil.encrypt(clearText.getBytes(StandardCharsets.UTF_8), recipientKey);
 
                                 String base64 = Base64.getEncoder().encodeToString(encrypted);
+                                System.out.println(base64);
                                 // Gửi tin nhắn mã hóa đến client
                                 client.sendMessage("/rsamsg " + this.username + " " + base64);
                             } catch (Exception e) {
@@ -91,6 +92,57 @@ public class ClientHandler implements Runnable {
                             }
                         }
                     }
+                    continue;
+                }
+                else if (msg.startsWith("/file ")) {
+                    String[] parts = msg.split(" ", 3);
+                    if (parts.length < 3) continue;
+
+                    String fileName = parts[1];
+                    long fileSize = Long.parseLong(parts[2]);
+
+                    System.out.println("📥 Đang nhận file từ " + username + ": " + fileName + " (" + fileSize + " bytes)");
+
+                    File dir = new File("received_files");
+                    if (!dir.exists()) dir.mkdir();
+
+                    File outFile = new File(dir, fileName);
+                    try (
+                        FileOutputStream fos = new FileOutputStream(outFile);
+                        BufferedOutputStream bos = new BufferedOutputStream(fos)
+                    ) {
+                        byte[] buffer = new byte[4096];
+                        long remaining = fileSize;
+
+                        while (remaining > 0) {
+                            int read = socket.getInputStream().read(buffer, 0, (int) Math.min(buffer.length, remaining));
+                            if (read == -1) break;
+                            bos.write(buffer, 0, read);
+                            remaining -= read;
+                        }
+
+                        bos.flush();
+                        System.out.println("✅ Đã nhận xong file: " + fileName);
+                        out.println("📥 Server đã nhận file: " + fileName);
+                        
+                     // ✅ Lưu thông báo file vào DB
+                        String fileMessage = "📁 " + username + " đã gửi file: " + outFile.getName() + " – [Tải về]";
+                        MessageDAO.sendMessage(username, currentRoom, fileMessage);
+
+
+                        // ✅ BƯỚC 4: Gửi thông báo đến các client cùng phòng
+                        String notify = "/sendfile " + username + " " + fileName;
+
+                        for (ClientHandler client : clients) {
+                            if (client.currentRoom != null && client.currentRoom.equals(this.currentRoom)) {
+                                client.sendMessage(notify);  // Gửi cho cả người gửi và các client khác
+                            }
+                        }
+                    } catch (IOException e) {
+                        System.err.println("❌ Lỗi khi nhận file: " + fileName);
+                        e.printStackTrace();
+                    }
+
                     continue;
                 }
 
@@ -136,6 +188,7 @@ public class ClientHandler implements Runnable {
                     broadcast(username + ": " + msg, currentRoom, true);
                     MessageDAO.sendMessage(username, currentRoom, msg); // đúng vị trí
                 }
+                
             }
 
 

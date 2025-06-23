@@ -4,7 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 
 public class MessageBubble extends JPanel {
+	 private String message;
     public MessageBubble(String text, boolean isMine) {
+    	this.message = text;
         setLayout(new BorderLayout());
         setOpaque(false);
 
@@ -12,7 +14,7 @@ public class MessageBubble extends JPanel {
         area.setWrapStyleWord(true);
         area.setLineWrap(true);
         area.setEditable(false);
-        area.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        area.setFont(new Font("Segoe UI", Font.PLAIN, 16)); // ✅ Font hiển thị emoji
         area.setBackground(isMine ? new Color(0, 120, 215) : new Color(230, 230, 230));
         area.setForeground(isMine ? Color.WHITE : Color.BLACK);
         area.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
@@ -28,6 +30,10 @@ public class MessageBubble extends JPanel {
         alignPanel.add(bubble);
 
         add(alignPanel, BorderLayout.CENTER);
+    }
+    
+    public String getMessage() {  // ✅ Thêm hàm này
+        return message;
     }
 
     @Override

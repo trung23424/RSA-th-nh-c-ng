@@ -33,6 +33,7 @@ public class SocketClientHandler implements Runnable {
                     if (parts.length == 3) {
                         String sender = parts[1];
                         String encryptedBase64 = parts[2];
+                        System.out.println("Base64 nhận được: " + encryptedBase64);
                         try {
                             byte[] encryptedBytes = Base64.getDecoder().decode(encryptedBase64);
                             byte[] decryptedBytes = security.EncryptionUtil.decrypt(encryptedBytes, MyKeyManager.getPrivateKey());
@@ -49,7 +50,21 @@ public class SocketClientHandler implements Runnable {
                             e.printStackTrace();
                         }
                     }
-                } else {
+                } 
+                else if (serverMessage.startsWith("/sendfile ")) {
+                    String[] parts = serverMessage.split(" ", 3);
+                    if (parts.length == 3) {
+                        String sender = parts[1];
+                        String fileName = parts[2];
+
+                        String message = "📁 " + sender + " đã gửi file: " + fileName + " – [Tải về]";
+                        boolean isMine = sender.equals(currentUser);
+                        SwingUtilities.invokeLater(() -> chatView.addMessage(message, isMine));
+                     // ✅ THÊM VÀO ĐÂY: xử lý cho phép click để tải
+                        chatView.attachDownloadAction(message);
+                    }
+                }
+                else {
                     // Xử lý các tin nhắn hệ thống/thông thường khác
                     final String finalMsg = serverMessage;
                     boolean isMine = finalMsg.startsWith(currentUser + ":");
