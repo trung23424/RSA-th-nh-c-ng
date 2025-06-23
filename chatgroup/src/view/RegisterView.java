@@ -2,10 +2,12 @@ package view;
 
 import dao.UserDAO;
 import model.User;
+import security.PasswordUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.security.MessageDigest;
 
 public class RegisterView extends JFrame {
     private JTextField txtUsername;
@@ -50,21 +52,27 @@ public class RegisterView extends JFrame {
 
         // Xử lý nút đăng ký
         btnSubmit.addActionListener(e -> {
+            // ✅ Lấy thông tin từ người dùng nhập
             String username = txtUsername.getText().trim();
-            String password = new String(txtPassword.getPassword()).trim();
+            String rawPassword = new String(txtPassword.getPassword()).trim();
 
-            if (username.isEmpty() || password.isEmpty()) {
+            // ✅ Kiểm tra rỗng
+            if (username.isEmpty() || rawPassword.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Vui lòng nhập đầy đủ thông tin.");
                 return;
             }
 
-            User newUser = new User(username, password);
+            // 🔐 Mã hóa mật khẩu bằng SHA-256
+            String hashedPassword = PasswordUtil.hashPassword(rawPassword);
+
+            // ✅ Tạo user với mật khẩu đã mã hóa
+            User newUser = new User(username, hashedPassword);
             boolean success = UserDAO.register(newUser);
 
             if (success) {
                 JOptionPane.showMessageDialog(this, "🎉 Đăng ký thành công!");
                 dispose(); // đóng form đăng ký
-                new LoginView(); // quay lại form đăng nhập
+                new LoginView(); // quay về form đăng nhập
             } else {
                 JOptionPane.showMessageDialog(this, "❌ Đăng ký thất bại. Tài khoản có thể đã tồn tại.");
             }

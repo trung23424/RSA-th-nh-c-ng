@@ -2,6 +2,7 @@ package view;
 
 import dao.UserDAO;
 import model.User;
+import security.PasswordUtil;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -56,24 +57,26 @@ public class LoginView extends JFrame {
         // Sự kiện nút
         btnLogin.addActionListener(e -> {
             String username = txtUsername.getText().trim();
-            String password = new String(txtPassword.getPassword());
+            String rawPassword = new String(txtPassword.getPassword()).trim();
 
-            if (username.isEmpty() || password.isEmpty()) {
+            if (username.isEmpty() || rawPassword.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Vui lòng nhập đầy đủ thông tin.");
                 return;
             }
 
-            User user = new User(username, password);
-            boolean success = UserDAO.login(user);
+            String hashedPassword = PasswordUtil.hashPassword(rawPassword);
+            User user = new User(username, hashedPassword); // ✅ đúng cú pháp
+            boolean success = UserDAO.login(user); // ✅ truyền đúng kiểu
 
             if (success) {
                 JOptionPane.showMessageDialog(this, "✅ Đăng nhập thành công!");
-                dispose(); // Đóng LoginView
-                new ChatRoomView(username); // Mở giao diện chat nhóm
+                dispose();
+                new ChatRoomView(username);
             } else {
                 JOptionPane.showMessageDialog(this, "❌ Sai tài khoản hoặc mật khẩu.");
             }
         });
+
         
         btnRegister.addActionListener(e -> {
             dispose(); // đóng cửa sổ hiện tại
